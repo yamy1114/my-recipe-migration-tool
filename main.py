@@ -3,14 +3,14 @@ import re
 from IPython import embed
 
 from notion.client import NotionClient
-from notion.block import BulletedListBlock, NumberedListBlock, TextBlock, HeaderBlock, ImageBlock
+from notion.block import BulletedListBlock, NumberedListBlock, TextBlock, HeaderBlock, ImageBlock, CalloutBlock
 
 import chromedriver_binary
 from selenium import webdriver
 
 NOTION_TOKEN = os.environ['NOTION_TOKEN']
-USERNAME = os.environ['COOKPAD_USERNAME']
-PASSWORD = os.environ['COOKPAD_PASSWORD']
+COOKPAD_USERNAME = os.environ['COOKPAD_USERNAME']
+COOKPAD_PASSWORD = os.environ['COOKPAD_PASSWORD']
 
 class CookpadScraper:
     COOKPAD_LOGIN_URL = 'https://cookpad.com/login'
@@ -26,19 +26,23 @@ class CookpadScraper:
         self.driver.get(self.COOKPAD_LOGIN_URL)
         login_form = self.driver.find_element_by_class_name('cp_form')
         login_form_email = login_form.find_element_by_id('login_form_email')
-        login_form_email.send_keys(USERNAME)
+        login_form_email.send_keys(COOKPAD_USERNAME)
         login_form_password = login_form.find_element_by_id('login_form_password')
-        login_form_password.send_keys(PASSWORD)
+        login_form_password.send_keys(COOKPAD_PASSWORD)
         login_form_button = login_form.find_element_by_class_name('button')
         login_form_button.click()
 
-    def get_ingredients_and_directions(self, url):
+    def get_recipe_data(self, url):
         self.driver.get(url)
 
         ingredients = []
         directions = []
 
+        pro_recipe_title = self.driver.find_element_by_class_name('pro_recipe_title')
+        description = pro_recipe_title.find_element_by_class_name('description').text
+
         recipe_ingredients = self.driver.find_element_by_class_name('recipe_ingredients')
+        volume_unit = recipe_ingredients.find_element_by_class_name('unit').text
         items = recipe_ingredients.find_elements_by_class_name('item')
 
         for item in items:
@@ -55,7 +59,7 @@ class CookpadScraper:
         for step_text in step_texts:
             directions.append(step_text.text)
 
-        return [ingredients, directions]
+        return [description, volume_unit, ingredients, directions]
 
 class NotionRecipeTool:
     NOTION_RECIPE_PAGE_URL = 'https://www.notion.so/11c19a60d8f7497ea65cccc088019472'
@@ -68,15 +72,19 @@ class NotionRecipeTool:
     def get_recipes(self):
         return self.recipes
 
-    def add_recipe_detail(self, recipe, ingredients, directions):
+    def add_recipe_detail(self, recipe, description, volume_unit, ingredients, directions):
         children = recipe.children
         self._clear_blocks_without_first_image(children)
 
-        children.add_new(HeaderBlock, title = 'Ingredients')
+        children.add_new(TextBlock, title='')
+        children.add_new(CalloutBlock, title=description, color='brown_background', icon='👨‍🍳')
+
+        children.add_new(HeaderBlock, title='Ingredients')
+        children.add_new(CalloutBlock, title=volume_unit, color='brown_background', icon='☝️')
 
         for ingredient in ingredients:
             children.add_new(BulletedListBlock, title='{item} {unit}'.format(item=ingredient["item_name"], unit=ingredient['item_unit']))
-        children.add_new(HeaderBlock, title = 'Directions')
+        children.add_new(HeaderBlock, title='Directions')
 
         for direction in directions:
             children.add_new(NumberedListBlock, title=direction)
@@ -108,10 +116,8 @@ for recipe in notion_recipe_tool.get_recipes():
         print('skip!')
         continue
 
-    ingredients, directions = cookpad_scraper.get_ingredients_and_directions(recipe.url)
-    notion_recipe_tool.add_recipe_detail(recipe, ingredients, directions)
+    description, volume_unit, ingredients, directions = cookpad_scraper.get_recipe_data(recipe.url)
+    notion_recipe_tool.add_recipe_detail(recipe, description, volume_unit, ingredients, directions)
     recipe.integration_status = 'DONE'
 
     print('done!')
-
-embed()
