@@ -1,4 +1,4 @@
-# notion-importer-for-cookpad-pro
+# my-recipe-migration-tool
 
 * package のインストール
 ```
