@@ -1,10 +1,10 @@
 # my-recipe-migration-tool
 
-* package のインストール
+* install packages
 ```
 pipenv install
 ```
-* 実行
+* run
 ```
 pipenv run start
 ```
