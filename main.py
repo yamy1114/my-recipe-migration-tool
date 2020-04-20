@@ -34,6 +34,7 @@ class CookpadScraper:
 
     def get_recipe_data(self, url):
         self.driver.get(url)
+        self.driver.implicitly_wait(10)
 
         ingredients = []
         directions = []
@@ -106,18 +107,21 @@ notion_recipe_tool = NotionRecipeTool(NOTION_TOKEN)
 cookpad_scraper = CookpadScraper()
 
 for recipe in notion_recipe_tool.get_recipes():
-    # url に // が誤って含まれているのを修正しておく
-    fixed_url = re.sub(r'cookpad.com//pro', 'cookpad.com/pro', recipe.url)
-    recipe.url = fixed_url
+    try:
+        # url に // が誤って含まれているのを修正しておく
+        fixed_url = re.sub(r'cookpad.com//pro', 'cookpad.com/pro', recipe.url)
+        recipe.url = fixed_url
 
-    print('start: ' + recipe.title)
+        print('start: ' + recipe.title)
 
-    if recipe.integration_status == 'DONE' or not re.match(r'https://cookpad.com/pro/.*', recipe.url):
-        print('skip!')
-        continue
+        if recipe.integration_status == 'DONE' or not re.match(r'https://cookpad.com/pro/.*', recipe.url):
+            print('skip!')
+            continue
 
-    description, volume_unit, ingredients, directions = cookpad_scraper.get_recipe_data(recipe.url)
-    notion_recipe_tool.add_recipe_detail(recipe, description, volume_unit, ingredients, directions)
-    recipe.integration_status = 'DONE'
+        description, volume_unit, ingredients, directions = cookpad_scraper.get_recipe_data(recipe.url)
+        notion_recipe_tool.add_recipe_detail(recipe, description, volume_unit, ingredients, directions)
+        recipe.integration_status = 'DONE'
 
-    print('done!')
+        print('done!')
+    except:
+        print('error!')
